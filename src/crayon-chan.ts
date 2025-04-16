@@ -1,6 +1,6 @@
 
 import * as dotenv from 'dotenv';
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, Message, GatewayIntentBits, TextChannel } from 'discord.js';
 import fetch from 'node-fetch';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import * as fs from 'fs';
@@ -12,11 +12,17 @@ export async function startCrayonChan(client: Client) {
         console.log(`Logged in as ${client.user?.tag}!`);
     });
 
-    client.on('messageCreate', async (message) => {
+
+    client.on('messageCreate', async (message: Message) => {
         if (message.author.bot) return; // Ignore messages from other bots
 
-        if (message.channel.name === 'bot-dev') {
+        if (message.channel instanceof TextChannel && message.channel.name === 'bot-dev') {
             console.log(`Received message: ${message.content} from ${message.author.tag}`);
+        }
+
+        if (!client.user?.id) {
+            console.warn("Client user or client user ID is not available.");
+            return;
         }
 
         if (message.mentions.users.has(client.user.id)) {
@@ -27,7 +33,7 @@ export async function startCrayonChan(client: Client) {
             let msgContent = message.content;
 
             // Remove the bot's mention from the message content using regex
-            const botMentionRegex = new RegExp(`(<@!?${client.user.id}>\\s*)`, 'gi');
+            const botMentionRegex = new RegExp(`(<@!?${client.user?.id ?? ''}>\\s*)`, 'gi');
             let contentWithoutMention = msgContent.replace(botMentionRegex, '').trim();
 
             // Log the message content after mention removal
@@ -81,7 +87,7 @@ export async function startCrayonChan(client: Client) {
 
             const channel = client.channels.cache.get(channelId);
 
-            if (channel && channel.isTextBased()) {
+            if (channel && channel.isTextBased() && channel instanceof TextChannel) {
                 try {
                     await channel.send(text);
                     message.reply(`Sent message to channel ${channelId}`);
@@ -117,7 +123,7 @@ async function getGeminiResponse(message: any, client: any): Promise<string> {
     // Fetch conversation history
     const channel = client.channels.cache.get(message.channelId);
     console.log(`Channel: ${channel}`);
-    let history = [];
+    let history: { role: string; parts: { text: string; }[]; }[] = [];
     if (channel && channel.isTextBased()) {
         let messages = await channel.messages.fetch({ limit: 10 }); // Fetch last 10 messages
         messages = messages.sort((a, b) => a.createdTimestamp - b.createdTimestamp); // Sort messages by timestamp
@@ -146,10 +152,22 @@ async function getGeminiResponse(message: any, client: any): Promise<string> {
     const msg = message.content;
     try {
         console.log(`Sending message to Gemini: ${msg}`);
-        const result = await chat.sendMessage(msg);
+        let result;
+        try {
+            result = await chat.sendMessage(msg);
+        } catch (sendMessageError: any) {
+            console.error("Failed to sendMessage to Gemini:", sendMessageError);
+            console.error("sendMessageError details:", sendMessageError.message, sendMessageError.stack);
+            return "Failed to get information from Gemini due to sendMessage error.";
+        }
+        console.log(`Result from sendMessage: ${JSON.stringify(result)}`);
         const response = await result.response;
         const responseText = response.text();
         console.log(`Gemini response: ${responseText}`);
+
+        if (responseText === "Failed to get information from Gemini.") {
+            return "Gemini was unable to provide a response.";
+        }
 
         if (responseText.length > 2000) {
             // Split the response into chunks of 2000 characters
@@ -163,8 +181,9 @@ async function getGeminiResponse(message: any, client: any): Promise<string> {
         } else {
             return responseText;
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to get response from Gemini:", error);
+        console.error("Error details:", error.message, error.stack); // Log the error message and stack trace
         return "Failed to get information from Gemini.";
     }
 }
