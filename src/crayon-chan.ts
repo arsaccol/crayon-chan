@@ -37,10 +37,16 @@ export async function startCrayonChan(client: Client) {
             if (contentWithoutMention && contentWithoutMention.length > 0) {
                 try {
                     const geminiResponse = await getGeminiResponse(message, client);
-                    message.reply(geminiResponse);
+                    const reply = await message.reply(geminiResponse);
+                    if (!reply) {
+                        console.error('Failed to send reply.');
+                    }
                 } catch (error) {
                     console.error('Failed to get response from Gemini:', error);
-                    message.reply('Could not retrieve information from Gemini.');
+                    const reply = await message.reply('Could not retrieve information from language model.');
+                    if (!reply) {
+                        console.error('Failed to send reply.');
+                    }
                 }
             } else {
                 message.reply('You mentioned me, but didn\'t ask anything!');
