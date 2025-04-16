@@ -6,13 +6,15 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "NODE_ENV=development tsx watch src/main.ts"
   },
-
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
     "@types/node": "^22.14.1",
+    "discord.js": "^14.18.0",
     "dotenv": "^16.5.0",
+    "node-fetch": "^3.3.2",
     "tsx": "^4.19.3"
   }
 }
