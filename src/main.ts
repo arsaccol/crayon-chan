@@ -1,11 +1,6 @@
-import * as dotenv from 'dotenv';
 import { Client, GatewayIntentBits } from 'discord.js';
 import { startCrayonChan } from './crayon-chan';
-
-const envFile = `.env.${process.env.NODE_ENV || 'development'}`;
-dotenv.config({ path: envFile });
-
-console.log(`Loading environment variables from ${envFile}`);
+import { discordApiKey } from './config';
 
 const client = new Client({
     intents: [
@@ -15,14 +10,12 @@ const client = new Client({
     ],
 });
 
-const token = process.env.DISCORD_API_KEY;
-
-if (!token) {
+if (!discordApiKey) {
     console.error('Discord token is not set in environment variables.');
     process.exit(1);
 }
 
-client.login(token);
+client.login(discordApiKey);
 
 startCrayonChan(client);
 
