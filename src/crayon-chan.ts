@@ -3,6 +3,18 @@ import { Client, Message, TextChannel } from 'discord.js';
 import { getGeminiResponse } from './gemini_api';
 import { handleChannelsCommand, handleSendCommand } from './commands';
 
+async function sendMessageChunked(message: Message, content: string): Promise<void> {
+    const chunkSize = 2000;
+    for (let i = 0; i < content.length; i += chunkSize) {
+        const chunk = content.substring(i, i + chunkSize);
+        try {
+            await message.channel.send(chunk);
+        } catch (error) {
+            console.error('Failed to send message chunk:', error);
+        }
+    }
+}
+
 export async function startCrayonChan(client: Client) {
     client.on('ready', () => {
         console.log(`Logged in as ${client.user?.tag}!`);
@@ -35,9 +47,13 @@ export async function startCrayonChan(client: Client) {
             if (contentWithoutMention && contentWithoutMention.length > 0) {
                 try {
                     const geminiResponse = await getGeminiResponse(message, client);
-                    const reply = await message.reply(geminiResponse?.text || 'Could not retrieve information from language model.');
-                    if (!reply) {
-                        console.error('Failed to send reply.');
+                    if (geminiResponse?.text) {
+                        await sendMessageChunked(message, geminiResponse.text);
+                    } else {
+                        const reply = await message.reply('Could not retrieve information from language model.');
+                        if (!reply) {
+                            console.error('Failed to send reply.');
+                        }
                     }
                 } catch (error) {
                     console.error('Failed to get response from Gemini:', error);

@@ -72,19 +72,7 @@ async function getGeminiResponse(message: Message, client: any): Promise<GeminiR
         if (responseText === "Failed to get information from Gemini.") {
             return { text: "Gemini was unable to provide a response." };
         }
-
-        if (responseText.length > 2000) {
-            // Split the response into chunks of 2000 characters
-            const chunkSize = 2000;
-            let chunk = "";
-            for (let i = 0; i < responseText.length; i += chunkSize) {
-                chunk = responseText.substring(i, i + chunkSize);
-                await message.reply(chunk);
-            }
-            return { text: chunk };
-        } else {
-          return { text: responseText };
-        }
+        return { text: responseText };
     } catch (error: any) {
         console.error("Failed to get response from Gemini:", error);
         console.error("Error details:", error.message, error.stack); // Log the error message and stack trace
