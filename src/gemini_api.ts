@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { geminiApiKey } from './config';
-import { Message } from 'discord.js';
 import { MessageHistory } from './interfaces/messageHistory';
 import * as fs from 'fs'
 import * as path from 'path';
