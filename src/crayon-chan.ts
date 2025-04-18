@@ -1,6 +1,6 @@
 
 import { Client, Message, TextChannel } from 'discord.js';
-import { getGeminiResponse } from './gemini_api';
+import { getGeminiResponse, decideWhetherBotWasTalkedTo } from './gemini_api';
 import { MessageHistory } from './interfaces/messageHistory';
 import { handleChannelsCommand, handleSendCommand } from './commands';
 async function fetchMessageHistory(message: Message, client: Client): Promise<MessageHistory[]> {
@@ -58,19 +58,16 @@ export async function startCrayonChan(client: Client) {
             return;
         }
 
-        if (message.mentions.users.has(client.user.id)) {
-            // Log the original message content
-            console.log(`Original message content: ${message.content}`);
+        try {
+            const history = await fetchMessageHistory(message, client);
+            const shouldRespond = await decideWhetherBotWasTalkedTo(history);
 
-            // Remove the bot's mention from the message content using regex
-            const botMentionRegex = new RegExp(`(<@!?${client.user?.id ?? ''}>\\s*)`, 'gi');
-            let contentWithoutMention = message.content.replace(botMentionRegex, '').trim();
+            if (shouldRespond) {
+                // Remove the bot's mention from the message content using regex
+                const botMentionRegex = new RegExp(`(<@!?${client.user?.id ?? ''}>\\s*)`, 'gi');
+                let contentWithoutMention = message.content.replace(botMentionRegex, '').trim();
 
-            // Log the message content after mention removal
-            console.log(`Message content after mention removal: ${contentWithoutMention}`);
 
-            try {
-                const history = await fetchMessageHistory(message, client);
                 const geminiResponse = await getGeminiResponse(contentWithoutMention, history);
                 if (geminiResponse?.text) {
                     await sendMessageChunked(message, geminiResponse.text);
@@ -80,16 +77,18 @@ export async function startCrayonChan(client: Client) {
                         console.error('Failed to send reply.');
                     }
                 }
-            } catch (error) {
-                console.error('Failed to get response from Gemini:', error);
-                const reply = await message.reply('Could not retrieve information from language model.');
-                if (!reply) {
-                    console.error('Failed to send reply.');
-                }
+            } else {
+                console.log("Bot decided not to respond.");
             }
-        } else {
-            message.reply('You mentioned me, but didn\'t ask anything!');
+        } catch (error) {
+            console.error('Failed to get response from Gemini or determine if bot was talked to:', error);
+            const reply = await message.reply('Could not retrieve information from language model.');
+            if (!reply) {
+                console.error('Failed to send reply.');
+            }
         }
+
+        if (message.mentions.users.has(client.user.id)) return;
 
         if (message.content === '!channels') {
             await handleChannelsCommand(message);
