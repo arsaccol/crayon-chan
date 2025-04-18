@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { geminiApiKey } from './config';
 import { Message } from 'discord.js';
+import { MessageHistory } from './interfaces/messageHistory';
 import * as fs from 'fs'
 import * as path from 'path';
 
@@ -12,7 +13,7 @@ interface GeminiResponse {
     text: string;
 }
 
-async function getGeminiResponse(message: string, history: { role: string; parts: { text: string; }[]; }[] = []): Promise<GeminiResponse> {
+async function getGeminiResponse(message: string, history: MessageHistory[] = []): Promise<GeminiResponse> {
     console.log("getGeminiResponse called");
 
     const genAI = new GoogleGenerativeAI(geminiApiKey);

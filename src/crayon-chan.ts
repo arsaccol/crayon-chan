@@ -1,11 +1,12 @@
 
 import { Client, Message, TextChannel } from 'discord.js';
 import { getGeminiResponse } from './gemini_api';
+import { MessageHistory } from './interfaces/messageHistory';
 import { handleChannelsCommand, handleSendCommand } from './commands';
-
-async function fetchMessageHistory(message: Message, client: Client): Promise<any[]> {
+async function fetchMessageHistory(message: Message, client: Client): Promise<MessageHistory[]> {
     const channel = client.channels.cache.get(message.channelId);
     if (channel && channel.isTextBased()) {
+
         try {
             let messages = await channel.messages.fetch({ limit: 10 }); // Fetch last 10 messages
             messages = messages.sort((a, b) => a.createdTimestamp - b.createdTimestamp); // Sort messages by timestamp
