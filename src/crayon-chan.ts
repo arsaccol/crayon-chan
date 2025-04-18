@@ -1,8 +1,9 @@
 
 import { Client, Message, TextChannel } from 'discord.js';
-import { getGeminiResponse, decideWhetherBotWasTalkedTo } from './gemini_api';
+import { getGeminiResponse, decideWhetherBotWasTalkedTo, FunctionMapping } from './gemini_api';
 import { MessageHistory } from './interfaces/messageHistory';
 import { handleChannelsCommand, handleSendCommand } from './commands';
+
 async function fetchMessageHistory(message: Message, client: Client): Promise<MessageHistory[]> {
     const channel = client.channels.cache.get(message.channelId);
     if (channel && channel.isTextBased()) {
@@ -18,7 +19,7 @@ async function fetchMessageHistory(message: Message, client: Client): Promise<Me
             // Filter out model messages at the beginning of the history
             while (history.length > 0 && history[0].role === 'model') {
                 history.shift();
-            }
+    }
             return history;
         } catch (error) {
             console.error("Failed to fetch message history:", error);
@@ -39,6 +40,32 @@ async function sendMessageChunked(message: Message, content: string): Promise<vo
             console.error('Failed to send message chunk:', error);
         }
     }
+}
+
+function buildToolsConfig(): any[] { // Consider using a more specific type if available from the SDK
+    return [ // The outer array holds tool configurations (often just one for function calling)
+        {
+            // The key should be 'functionDeclarations' holding an array of functions
+            functionDeclarations: [
+                { // This is the actual function declaration object
+                    name: "get_weather",
+                    description: "Get the current weather in a city",
+                    parameters: {
+                        type: "OBJECT", // Correct: Type of the parameters structure itself
+                        properties: {
+                            city: {
+                                type: "STRING",
+                                description: "The city to get the weather for. If there are ambiguities between cities with the same name in different countries, you should give preference to cities from Brazil",
+                            },
+                        },
+                        required: ["city"]
+                    }
+                }
+                // Add more function declarations here if needed
+                // , { name: "another_function", ... }
+            ]
+        }
+    ];
 }
 
 export async function startCrayonChan(client: Client) {
@@ -67,10 +94,16 @@ export async function startCrayonChan(client: Client) {
                 const botMentionRegex = new RegExp(`(<@!?${client.user?.id ?? ''}>\\s*)`, 'gi');
                 let contentWithoutMention = message.content.replace(botMentionRegex, '').trim();
 
+                // Build the tools configuration
+                const tools = buildToolsConfig();
 
-                const geminiResponse = await getGeminiResponse(contentWithoutMention, history);
+                const geminiResponse = await getGeminiResponse(contentWithoutMention, history, tools);
+                console.log('====================================');
+                console.log({geminiResponse});
+                console.log('====================================');
                 if (geminiResponse?.text) {
                     await sendMessageChunked(message, geminiResponse.text);
+
                 } else {
                     const reply = await message.reply('Could not retrieve information from language model.');
                     if (!reply) {
@@ -101,3 +134,4 @@ export async function startCrayonChan(client: Client) {
         }
     });
 }
+

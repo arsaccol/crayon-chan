@@ -3,32 +3,41 @@ import { geminiApiKey } from './config';
 import { MessageHistory } from './interfaces/messageHistory';
 import * as fs from 'fs'
 import * as path from 'path';
+import { getWeather } from './services/weather_service';
 
 const systemPromptPath = path.join(__dirname, '../system_prompt.txt');
 const systemPrompt = fs.readFileSync(systemPromptPath, 'utf-8')
 
-
-interface GeminiResponse {
-    text: string;
+export interface FunctionMapping {
+    [name: string]: (args: any) => Promise<string>;
 }
 
-async function getGeminiResponse(message: string, history: MessageHistory[] = []): Promise<GeminiResponse> {
+
+interface GeminiResponse {
+    text?: string;
+    function_call?: {
+        name: string;
+        arguments: any;
+    };
+}
+
+async function getGeminiResponse(message: string, history: MessageHistory[] = [], tools?: any[]): Promise<GeminiResponse> {
     console.log("getGeminiResponse called");
 
     const genAI = new GoogleGenerativeAI(geminiApiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash", tools: tools });
 
 
-   if (history && Array.isArray(history)) {
-       history.unshift({ role: 'user', parts: [{ text: systemPrompt }] });
-   } else {
-       console.error("History is not a valid array:", history);
-   }
+    if (history && Array.isArray(history)) {
+        history.unshift({ role: 'user', parts: [{ text: systemPrompt }] });
+    } else {
+        console.error("History is not a valid array:", history);
+    }
 
 
     try {
         console.log(`Sending message to Gemini: ${message}`);
-	const chat = model.startChat({history});
+        const chat = model.startChat({ history });
         let result;
         try {
             result = await chat.sendMessage(message);
@@ -39,13 +48,40 @@ async function getGeminiResponse(message: string, history: MessageHistory[] = []
         }
         console.log(`Result from sendMessage: ${JSON.stringify(result)}`);
         const response = await result.response;
+
+        // Check for function call
+        if (response.candidates && response.candidates.length > 0 && response.candidates[0].content.parts) {
+            const firstPart = response.candidates[0].content.parts[0];
+            if (firstPart.functionCall) {
+                const functionName = firstPart.functionCall.name;
+                const functionArgs = firstPart.functionCall.args;
+
+                console.log(`Function call detected: ${functionName} with args ${JSON.stringify(functionArgs)}`);
+
+                // Map function names to their implementations
+                const functionMapping: FunctionMapping = {
+                    get_weather: getWeather,
+                };
+
+                if (functionName in functionMapping) {
+                    try {
+                        const functionResult = await functionMapping[functionName](functionArgs);
+                        return { text: functionResult };
+                    } catch (functionError: any) {
+                        console.error(`Error executing function ${functionName}:`, functionError);
+                        return { text: `Error executing function ${functionName}: ${functionError.message}` };
+                    }
+                } else {
+                    return { text: `Function ${functionName} not implemented.` };
+                }
+            }
+        }
+
         const responseText = response.text();
         console.log(`Gemini response: ${responseText}`);
-
-        if (responseText === "Failed to get information from Gemini.") {
-            return { text: "Gemini was unable to provide a response." };
-        }
         return { text: responseText };
+
+
     } catch (error: any) {
         console.error("Failed to get response from Gemini:", error);
         console.error("Error details:", error.message, error.stack); // Log the error message and stack trace
@@ -115,4 +151,4 @@ Respond with a JSON object that indicates whether the bot should respond and the
     }
 }
 
-export { getGeminiResponse, decideWhetherBotWasTalkedTo };
+export { getGeminiResponse, decideWhetherBotWasTalkedTo, FunctionMapping, functionDeclarations, setFunctionDeclarations };
