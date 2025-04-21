@@ -1,3 +1,4 @@
 node_modules
 .session.vim
 .env.development
+.env.production
