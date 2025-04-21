@@ -6,6 +6,53 @@ import * as path from 'path';
 import { getWeather } from './services/weather_service';
 import { colorize } from 'json-colorizer';
 
+async function handleFunctionCall(functionName: string, functionArgs: any, history: MessageHistory[]): Promise<GeminiResponse> {
+    // Map function names to their implementations
+    const functionMapping: FunctionMapping = {
+        get_weather: getWeather,
+    };
+
+    if (functionName in functionMapping) {
+        try {
+            const functionResult = await functionMapping[functionName](functionArgs);
+            // Format the weather data into a string that Gemini can use
+            if (functionResult) {
+                try {
+                    // The function call was successful
+                    const weatherData = JSON.parse(functionResult as string);
+
+                    // Check if weatherData is a string indicating an error
+                    if (typeof weatherData === 'string') {
+                        return { text: weatherData }; // Return the error message directly
+                    }
+
+                    // Ask Gemini to generate a weather report in prose
+                    const geminiProseResponse = await getGeminiResponse(
+                        `Here is the weather data: ${JSON.stringify(weatherData)}.  Please generate a short weather report in prose. Use emoji and keep a cheerful tone.`,
+                        history // Pass the history to maintain context
+                    );
+
+                    if (geminiProseResponse?.text) {
+                        return { text: geminiProseResponse.text };
+                    } else {
+                        return { text: "Failed to generate a weather report." };
+                    }
+                } catch (parseError) {
+                    console.error("Failed to parse weather data:", parseError);
+                    return { text: "The function call returned a result, but I was unable to parse it." };
+                }
+            } else {
+                return { text: "The function call returned no result." };
+            }
+        } catch (functionError: any) {
+            console.error(`Error executing function ${functionName}:`, functionError);
+            return { text: `Error executing function ${functionName}: ${functionError.message}` };
+        }
+    } else {
+        return { text: `Function ${functionName} not implemented.` };
+    }
+}
+
 
 const systemPromptPath = path.join(__dirname, '../system_prompt.txt');
 const systemPrompt = fs.readFileSync(systemPromptPath, 'utf-8')
@@ -59,52 +106,8 @@ async function getGeminiResponse(message: string, history: MessageHistory[] = []
                 const functionArgs = firstPart.functionCall.args;
 
                 console.log(`Function call detected: ${functionName} with args ${JSON.stringify(functionArgs)}`);
-
-                // Map function names to their implementations
-                const functionMapping: FunctionMapping = {
-                    get_weather: getWeather,
-                };
-
-                if (functionName in functionMapping) {
-                    try {
-                        const functionResult = await functionMapping[functionName](functionArgs);
-                        // Format the weather data into a string that Gemini can use
-                        if (functionResult) {
-                            try {
-                                // The function call was successful
-                                const weatherData = JSON.parse(functionResult as string);
-
-                                // Check if weatherData is a string indicating an error
-                                if (typeof weatherData === 'string') {
-                                    return { text: weatherData }; // Return the error message directly
-                                }
-
-                                const { city, temperature, feelsLike, description, humidity, windspeed } = weatherData;
-                                // Ask Gemini to generate a weather report in prose
-                                const geminiProseResponse = await getGeminiResponse(
-                                    `Here is the weather data: ${colorize(weatherData)}.  Please generate a short weather report in prose.`,
-                                    history // Pass the history to maintain context
-                                );
-
-                                if (geminiProseResponse?.text) {
-                                    return { text: geminiProseResponse.text };
-                                } else {
-                                    return { text: "Failed to generate a weather report." };
-                                }
-                            } catch (parseError) {
-                                console.error("Failed to parse weather data:", parseError);
-                                return {text: "The function call returned a result, but I was unable to parse it."};
-                            }
-                        } else {
-                            return { text: "The function call returned no result." };
-                        }
-                    } catch (functionError: any) {
-                        console.error(`Error executing function ${functionName}:`, functionError);
-                        return { text: `Error executing function ${functionName}: ${functionError.message}` };
-                    }
-                } else {
-                    return { text: `Function ${functionName} not implemented.` };
-                }
+                // Refactor: call extracted function to handle the function call
+                return await handleFunctionCall(functionName, functionArgs, history);
             } else if (response.candidates && response.candidates.length > 0 && response.candidates[0].content.parts) {
                 const responseText = response.candidates[0].content.parts[0].text;
                  if (tools && tools.length > 0 && !responseText) {
