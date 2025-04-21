@@ -93,7 +93,15 @@ export async function startCrayonChan(client: Client) {
 
         try {
             const history = await fetchMessageHistory(message, client);
-            const shouldRespond = await decideWhetherBotWasTalkedTo(history);
+
+            // if we're in production, bot should respond in any channel except bot-dev
+            // otherwise, bot should only respond in bot-dev
+            const responsePreconditions = message.channel instanceof TextChannel && (
+                (process.env.NODE_ENV === 'production') === (message.channel.name !== 'bot-dev')
+            );
+            console.log({env: process.env.NODE_ENV, channel: message.channel instanceof TextChannel && message.channel.name, responsePreconditions});
+
+            const shouldRespond = responsePreconditions && await decideWhetherBotWasTalkedTo(history);
 
             if (shouldRespond) {
                 // Remove the bot's mention from the message content using regex
