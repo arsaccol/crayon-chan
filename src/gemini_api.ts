@@ -4,6 +4,8 @@ import { MessageHistory } from './interfaces/messageHistory';
 import * as fs from 'fs'
 import * as path from 'path';
 import { getWeather } from './services/weather_service';
+import { colorize } from 'json-colorizer';
+
 
 const systemPromptPath = path.join(__dirname, '../system_prompt.txt');
 const systemPrompt = fs.readFileSync(systemPromptPath, 'utf-8')
@@ -46,7 +48,7 @@ async function getGeminiResponse(message: string, history: MessageHistory[] = []
             console.error("sendMessageError details:", sendMessageError.message, sendMessageError.stack);
             return { text: "Failed to get information from Gemini due to sendMessage error." };
         }
-        console.log(`Result from sendMessage: ${JSON.stringify(result)}`);
+        console.log(`Result from sendMessage: ${colorize(result)}`);
         const response = await result.response;
 
         // Check for function call
@@ -66,7 +68,36 @@ async function getGeminiResponse(message: string, history: MessageHistory[] = []
                 if (functionName in functionMapping) {
                     try {
                         const functionResult = await functionMapping[functionName](functionArgs);
-                        return { text: functionResult };
+                        // Format the weather data into a string that Gemini can use
+                        if (functionResult) {
+                            try {
+                                // The function call was successful
+                                const weatherData = JSON.parse(functionResult as string);
+
+                                // Check if weatherData is a string indicating an error
+                                if (typeof weatherData === 'string') {
+                                    return { text: weatherData }; // Return the error message directly
+                                }
+
+                                const { city, temperature, feelsLike, description, humidity, windspeed } = weatherData;
+                                // Ask Gemini to generate a weather report in prose
+                                const geminiProseResponse = await getGeminiResponse(
+                                    `Here is the weather data: ${colorize(weatherData)}.  Please generate a short weather report in prose.`,
+                                    history // Pass the history to maintain context
+                                );
+
+                                if (geminiProseResponse?.text) {
+                                    return { text: geminiProseResponse.text };
+                                } else {
+                                    return { text: "Failed to generate a weather report." };
+                                }
+                            } catch (parseError) {
+                                console.error("Failed to parse weather data:", parseError);
+                                return {text: "The function call returned a result, but I was unable to parse it."};
+                            }
+                        } else {
+                            return { text: "The function call returned no result." };
+                        }
                     } catch (functionError: any) {
                         console.error(`Error executing function ${functionName}:`, functionError);
                         return { text: `Error executing function ${functionName}: ${functionError.message}` };
@@ -74,14 +105,23 @@ async function getGeminiResponse(message: string, history: MessageHistory[] = []
                 } else {
                     return { text: `Function ${functionName} not implemented.` };
                 }
+            } else if (response.candidates && response.candidates.length > 0 && response.candidates[0].content.parts) {
+                const responseText = response.candidates[0].content.parts[0].text;
+                 if (tools && tools.length > 0 && !responseText) {
+                    console.warn("Model was expected to call a function but did not.");
+
+                    return { text: "I was expecting to use a tool, but something went wrong." };
+                }
+
+                return { text: responseText };
+            } else {
+               console.warn("Unexpected response structure from Gemini.  No candidates or content parts.");
+               return { text: "Unexpected response structure from Gemini." };
             }
+        } else {
+            console.warn("Unexpected response structure from Gemini. No response candidates");
+            return { text: "Unexpected response structure from Gemini." };
         }
-
-        const responseText = response.text();
-        console.log(`Gemini response: ${responseText}`);
-        return { text: responseText };
-
-
     } catch (error: any) {
         console.error("Failed to get response from Gemini:", error);
         console.error("Error details:", error.message, error.stack); // Log the error message and stack trace

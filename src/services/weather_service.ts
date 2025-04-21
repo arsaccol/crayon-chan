@@ -1,10 +1,16 @@
 import fetch from 'node-fetch';
 
-export async function getWeather(input: {city: string}): Promise<string> {
+export async function getWeather(input: {city: string}): Promise<unknown> {
     console.log("======================== 🌧️ CHECKING THE WEATHER ☀️ ===================")
     const { city } = input
 
     console.log(`🌆 Input city: ${city}`)
+
+    if (!city || typeof city !== 'string') {
+        console.error("Invalid city input:", city);
+        return "Invalid city provided.";
+    }
+
     try {
         const url = `https://wttr.in/${encodeURIComponent(city)}?format=j1`;
         const response = await fetch(url);
@@ -25,12 +31,23 @@ export async function getWeather(input: {city: string}): Promise<string> {
             const humidity = currentWeather.humidity;
             const windspeed = currentWeather.windspeedKmph;
 
-            return `The current weather in ${JSON.stringify(city, null, 2)} is ${description} with a temperature of ${temperature}°C (feels like ${feelsLike}°C). Humidity is ${humidity}%, Wind Speed is ${windspeed} Kmph.`;
+
+            return JSON.stringify({
+
+                city: city,
+                temperature: temperature,
+                feelsLike: feelsLike,
+                description: description,
+                humidity: humidity,
+                windspeed: windspeed
+
+            });
         } else {
-            return `Could not retrieve weather information for ${city}.`;
+            return JSON.stringify("Could not retrieve weather information for " + city + ".");
         }
     } catch (error) {
         console.error("Error fetching weather:", error);
-        return `Failed to retrieve weather information for ${city}.`;
+        return JSON.stringify("Failed to retrieve weather information for " + city + ".");
+
     }
 }
