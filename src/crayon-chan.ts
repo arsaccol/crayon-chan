@@ -49,7 +49,13 @@ function buildToolsConfig(): any[] { // Consider using a more specific type if a
             functionDeclarations: [
                 { // This is the actual function declaration object
                     name: "get_weather",
-                    description: "Fetches the current, real-time weather conditions (temperature, precipitation, wind, etc.) for a specific location using a reliable external API. Use this function *whenever* the user asks for weather information, forecasts, or conditions for any location. *Do not guess or make up weather information*; always use this tool for accuracy.",
+                    description: `
+                      Fetches the current, real-time weather conditions (temperature, precipitation, wind, etc.) 
+                      for a specific location using a reliable external API. Use this function *whenever* the user asks for weather information, 
+                      forecasts, or conditions for any location. *Do not guess or make up weather information*; always use this tool for accuracy.
+                      If you do not use this function, you must not answer any information. Answers about weather information should *always*
+                      employ this get_weather function.
+                    `,
                     parameters: {
                         type: "OBJECT", // Correct: Type of the parameters structure itself
                         properties: {
