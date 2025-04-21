@@ -5,7 +5,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "NODE_ENV=development tsx watch src/main.ts",
-    "start": "NODE_ENV=production tsx src/main.ts"
+    "start": "NODE_ENV=production tsx src/main.ts",
+    "start:prod": "pm2 start npm --name crayon-chan -- start",
+    "stop:prod": "pm2 stop crayon-chan",
+    "delete:prod": "pm2 delete crayon-chan"
   },
   "author": "",
   "license": "ISC",
