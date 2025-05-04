@@ -42,7 +42,7 @@ async function sendMessageChunked(message: Message, content: string): Promise<vo
     }
 }
 
-function buildToolsConfig(): any[] { // Consider using a more specific type if available from the SDK
+function defineToolkit(): any[] { // Consider using a more specific type if available from the SDK
     return [ // The outer array holds tool configurations (often just one for function calling)
         {
             // The key should be 'functionDeclarations' holding an array of functions
@@ -109,7 +109,7 @@ export async function startCrayonChan(client: Client) {
                 let contentWithoutMention = message.content.replace(botMentionRegex, '').trim();
 
                 // Build the tools configuration
-                const tools = buildToolsConfig();
+                const tools = defineToolkit();
 
                 const geminiResponse = await getGeminiResponse(contentWithoutMention, history, tools);
                 console.log('====================================');
